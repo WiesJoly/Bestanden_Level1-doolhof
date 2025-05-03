@@ -53,7 +53,7 @@ doolhof[1][0] = " "   #ingang
 
 def a_star(doolhof, start, doel):
     open_list = []  # The list of nodes to be evaluated
-    closed_list = []  # The list of nodes already evaluated
+    closed_list = set()  # The list of nodes already evaluated
     came_from = {}  # To reconstruct the path
 
     # Directions for movement: left, right, down, up (4 directions)
@@ -63,18 +63,17 @@ def a_star(doolhof, start, doel):
         neighbors = []
         for dx, dy in a_star_richtingen:
             nx, ny = x + dx, y + dy
-            mx, my = x + dx // 2, y + dy // 2  # Middle cell between start and destination
-            if (0 <= nx < len(doolhof[0]) and 0 <= ny < len(doolhof) and
-                doolhof[my][mx] != "X" and doolhof[ny][nx] != "X"):
+            if 0 <= nx < len(doolhof[0]) and 0 <= ny < len(doolhof) and doolhof[ny][nx] != "X":
                 neighbors.append((nx, ny))
         return neighbors
 
     def heuristic(a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])  # Manhattan distance
 
-    open_list.append((start, f_scores := heuristic(start, doel)))  # Start node and f_score
     g_scores = {start: 0}
     f_scores = {start: heuristic(start, doel)}
+    f_scores[start] = heuristic(start, doel)
+    open_list.append((start, f_scores[start]))  # Voeg start node toe met de berekende f_score
 
     while open_list:
         # Get the node with the lowest f_score from open_list
@@ -90,7 +89,7 @@ def a_star(doolhof, start, doel):
             path.append(start)  # Add the start node to the path
             return path[::-1]  # Reverse the path to start -> goal
 
-        closed_list.append(current)  # Move current node from open_list to closed_list
+        closed_list.add(current)  # Move current node from open_list to closed_list
 
         ######### PROBLEM
         print(current)
@@ -131,17 +130,24 @@ class Minotaurus:
         self.x = x
         self.y = y
         self.rect = pygame.Rect(x, y, blokjesgrootte, blokjesgrootte)
+        self.should_move = False  # A flag to control whether the Minotaur should move
     
     def move_towards_player(self, speler):
-        minotaurus_pos = (self.x, self.y)
-        speler_pos = (speler.rect.x, speler.rect.y)
+        minotaurus_pos = (self.rect.x // blokjesgrootte, self.rect.y // blokjesgrootte)
+        speler_pos = (speler.rect.x // blokjesgrootte, speler.rect.y // blokjesgrootte)
 
         path = a_star(doolhof, minotaurus_pos, speler_pos)
-        if path:
-            next_step = path[0]  # De eerstvolgende stap richting de speler
-            self.x, self.y = next_step[1] * blokjesgrootte, next_step[0] * blokjesgrootte
+        if path and len(path) > 1:
+            next_step = path[1]  # Path[0] is de huidige positie, [1] is de volgende stap
+            self.x, self.y = next_step[0] * blokjesgrootte, next_step[1] * blokjesgrootte
             self.rect.topleft = (self.x, self.y)
 
+    def update(self, speler):
+        """ Update the Minotaur’s behavior """
+        # Determine if Minotaur should move
+        if self.should_move:
+            self.move_towards_player(speler)
+    
     def draw(self, screen):
         minotaurus_afbeelding = pygame.image.load("minotaurus.png")
         minotaurus_afbeelding = pygame.transform.scale(minotaurus_afbeelding, (blokjesgrootte, blokjesgrootte))
@@ -150,7 +156,6 @@ class Minotaurus:
 # Doolhofgeneratie met A* controle op bereikbaarheid
 def genereer_doolhof_met_bereikbaarheid():
     while True:
-        doolhof = []  # Genereer je doolhof zoals je normaal doet
         for y in range(rijen):
             rij = ['X' for _ in range(kolommen)]
             doolhof.append(rij)
@@ -315,7 +320,7 @@ def check_item_opname(speler):
         
         # om de deuren te laten verschijnen doen we dit met een for-loop:
         for frame in deur_frames:
-            teken_doolhof_en_minotaurus() # we tekenen eerst nog eens het doolhof en de speler zodat we gaan bruin scherm als achtergrond hebben
+            teken_doolhof_en_minotaurus(minotaurus) # we tekenen eerst nog eens het doolhof en de speler zodat we gaan bruin scherm als achtergrond hebben
             speler.draw(scherm)
             scherm.blit(frame, (225, 70))  # Teken het frame van de deuranimatie op positie (225, 70)
             scherm.blit(Uitgang_open_tekst, Uitgang_open_rect)  # hiermee tekenen we de tekst op het scherm
@@ -328,7 +333,8 @@ def check_item_opname(speler):
     
         draad_locatie = None
 
-doolhof = genereer_doolhof_met_bereikbaarheid()
+#Dit leek het probleem te zijn waardoor het doolhof al gegenreerd werd, maar niet zichtbaar was.
+#doolhof = genereer_doolhof_met_bereikbaarheid()
 minotaurus = Minotaurus(10 * blokjesgrootte, 10 * blokjesgrootte)
 
 # de button image aanpassen:
@@ -402,7 +408,8 @@ def spelen(): #scherm om te spelen
             check_item_opname(speler)
     
        # Beweging Minotaurus
-        minotaurus.move_towards_player(speler)
+        minotaurus.should_move = True 
+        minotaurus.update(speler)  # Update the Minotaur’s movement
 
         # Teken alles
         teken_doolhof_en_minotaurus(minotaurus)
