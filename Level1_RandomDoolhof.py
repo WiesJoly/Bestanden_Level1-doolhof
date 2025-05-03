@@ -1,4 +1,3 @@
-@ -1,420 +0,0 @@
 # modules en initialisaties:  
 import pygame # Pygame bibliotheek laden 
 import sys
